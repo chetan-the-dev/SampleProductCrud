@@ -1,0 +1,76 @@
+<?php
+namespace App\Http\Controllers\API;
+
+use App\Http\Controllers\Controller;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+
+class ProductsController extends Controller
+{
+
+    public function demo(){
+        
+    }
+    /**
+     * Add product to database.
+     */
+    public function addProduct(Request $request)
+    {        
+        return $request->all();
+        try {
+            $addData = array(
+                'product_name' => $request['title'],
+                'product_category'=>$request['product_type'],
+                'product_description' => $request['body_html'],
+                'product_slug' => $request['handle'],
+                'status' => $request['status'] == 'active' ? 1 : 0,
+                'product_tags' => $request['tags'],
+                'product_vendor' => $request['vendor']
+            );
+    
+            $add_product = Product::createProduct($addData);
+            
+            if($add_product){
+                $product_variation = [];
+            
+                foreach($request['variants'] as $variants){
+                    $product_variant['product_id'] = $add_product->id;
+                    $product_variant['product_variant_price'] = $variants['compare_at_price'] > 0 ? $variants['compare_at_price'] : $variants['price'];
+                    $product_variant['product_variant_discount_price'] = $variants['compare_at_price'] > 0 ? $variants['price'] : null;
+                    $product_variant['weight_in_gram'] = $variants['grams'];
+                    $product_variant['weight'] = $variants['weight'];
+                    $product_variant['weight_unit'] = $variants['weight_unit'];
+                    $product_variant['product_variant_qty'] = $variants['inventory_quantity'];
+                    $product_variant['product_variant_position'] = $variants['position'];
+                    $product_variant['product_variant_sku'] = $variants['sku'];
+                    $variants_json = array();
+                    foreach($request['options'] as $key=>$option){
+                        $variants_data[$option['name']]=$variants['option'.$key+1];
+                        array_push($variants_json,$variants_data);
+                    }
+                    $product_variant['product_variant_info'] = json_encode($variants_json);
+                    $product_variant['product_variant_name'] = $variants['title'];
+                    
+
+                    array_push($product_variation,$product_variant);
+                }
+
+                if(count($product_variation)>0){
+                    ProductVariant::insert($product_variation);
+                }   
+
+                Log::info("Product added");
+                return response()->json(['success' => true]);
+            }else{
+                Log::info("Product not added");
+                return response()->json(['success' => false]);
+            }
+        } catch (\Exception $e) {
+            Log::error("Error in product add:".$e->getMessage());
+            return response()->json(['success' => false, 'error' => 'Server error'], 500);
+        }
+    }
+}
+?>
